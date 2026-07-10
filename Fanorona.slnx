@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Fanorona.Console/Fanorona.Console.csproj" />
+  <Project Path="Fanorona.Core/Fanorona.Core.csproj" />
+  <Project Path="Fanorona.Tests/Fanorona.Tests.csproj" />
+</Solution>
