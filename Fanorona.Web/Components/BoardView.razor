@@ -1,0 +1,189 @@
+<svg class="board" viewBox="0 0 @BoardGeometry.Width @BoardGeometry.Height"
+     xmlns="http://www.w3.org/2000/svg"
+     @oncontextmenu="() => OnRightClick.InvokeAsync()" @oncontextmenu:preventDefault="true">
+    <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+                orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" />
+        </marker>
+    </defs>
+
+    <rect x="6" y="6" width="@(BoardGeometry.Width - 12)" height="@(BoardGeometry.Height - 12)"
+          rx="14" class="board-bg" />
+
+    @foreach (var (a, b) in BoardGeometry.Lines())
+    {
+        var pa = P(a);
+        var pb = P(b);
+        <line x1="@pa.X" y1="@pa.Y" x2="@pb.X" y2="@pb.Y" class="grid" />
+    }
+
+    @* Opponent's (or your) last recorded move: blue path, ring on the landing point,
+       faded x where its captures were. *@
+    @if (LastTurn is { } last)
+    {
+        foreach (var segment in last.Segments)
+        {
+            var f = P(segment.From);
+            var t = P(segment.To);
+            <line x1="@f.X" y1="@f.Y" x2="@t.X" y2="@t.Y" class="last-path" />
+        }
+        var dest = P(last.Destination);
+        <circle cx="@dest.X" cy="@dest.Y" r="32" class="last-ring" />
+        foreach (var cell in MaskCells(last.CapturedMask))
+        {
+            @CapX(P(cell), "capx old")
+        }
+    }
+
+    @* Move being entered by clicking. *@
+    @if (SelectedPath is { Count: > 0 })
+    {
+        foreach (var segment in SelectedPath)
+        {
+            var f = P(segment.From);
+            var t = P(segment.To);
+            <line x1="@f.X" y1="@f.Y" x2="@t.X" y2="@t.Y" class="sel-path" />
+        }
+    }
+
+    @* Recommended move: numbered green arrows. *@
+    @if (Recommended is { } rec)
+    {
+        foreach (var segment in rec.Segments)
+        {
+            var (f, t) = Shorten(segment.From, segment.To, 14);
+            <line x1="@S(f.X)" y1="@S(f.Y)" x2="@S(t.X)" y2="@S(t.Y)" class="rec-line"
+                  marker-end="url(#arrow)" />
+        }
+        var recOrigin = P(rec.Origin);
+        <circle cx="@recOrigin.X" cy="@recOrigin.Y" r="32" class="sel-origin" />
+    }
+
+    @for (var i = 0; i < Board.Cells; i++)
+    {
+        var p = P(new Cell(i));
+        if ((Position.Pieces(Player.White) & 1UL << i) != 0)
+        {
+            <circle cx="@p.X" cy="@p.Y" r="26" class="piece white" />
+        }
+        else if ((Position.Pieces(Player.Black) & 1UL << i) != 0)
+        {
+            <circle cx="@p.X" cy="@p.Y" r="26" class="piece black" />
+        }
+    }
+
+    @* Marks that must sit on top of pieces. *@
+    @if (Recommended is { } recTop)
+    {
+        foreach (var cell in MaskCells(recTop.CapturedMask))
+        {
+            @CapX(P(cell), "capx")
+        }
+        if (recTop.IsCapture)
+        {
+            for (var i = 0; i < recTop.Segments.Length; i++)
+            {
+                var f = P(recTop.Segments[i].From);
+                var t = P(recTop.Segments[i].To);
+                var mx = (f.X + t.X) / 2;
+                var my = (f.Y + t.Y) / 2;
+                <g class="rec-badge">
+                    <circle cx="@mx" cy="@my" r="14" />
+                    @SvgText(mx, my + 7, null, (i + 1).ToString())
+                </g>
+            }
+        }
+    }
+
+    @if (SelectedOrigin is { } origin)
+    {
+        var p = P(origin);
+        <circle cx="@p.X" cy="@p.Y" r="32" class="sel-origin" />
+    }
+
+    @foreach (var cell in MaskCells(CapturedPreview))
+    {
+        @CapX(P(cell), "capx")
+    }
+
+    @* Approach/withdrawal disambiguation: the two capture groups, color-coded. *@
+    @foreach (var cell in MaskCells(PendingApproachMask))
+    {
+        var p = P(cell);
+        <circle cx="@p.X" cy="@p.Y" r="31" class="pend-a" />
+    }
+    @foreach (var cell in MaskCells(PendingWithdrawalMask))
+    {
+        var p = P(cell);
+        <circle cx="@p.X" cy="@p.Y" r="31" class="pend-w" />
+    }
+
+    @* Razor reserves the <text> tag, so SVG text elements are emitted as raw markup. *@
+    @for (var f = 0; f < Board.Files; f++)
+    {
+        var x = BoardGeometry.Point(Cell.At(f, 0), Flipped).X;
+        @SvgText(x, BoardGeometry.Height - 14, "lbl", ((char)('a' + f)).ToString())
+    }
+    @for (var r = 0; r < Board.Ranks; r++)
+    {
+        var y = BoardGeometry.Point(Cell.At(0, r), Flipped).Y;
+        @SvgText(20, y + 8, "lbl", (r + 1).ToString())
+    }
+
+    @for (var i = 0; i < Board.Cells; i++)
+    {
+        var cell = new Cell(i);
+        var p = P(cell);
+        var clickable = Clickable?.Contains(cell) == true;
+        if (clickable)
+        {
+            <circle cx="@p.X" cy="@p.Y" r="33" class="click-ring" />
+        }
+        <circle cx="@p.X" cy="@p.Y" r="38" class="hit @(clickable ? "on" : null)"
+                @onclick="() => OnCellClick.InvokeAsync(cell)" />
+    }
+</svg>
+
+@code {
+    [Parameter] public Position Position { get; set; }
+    [Parameter] public bool Flipped { get; set; }
+    [Parameter] public Turn? LastTurn { get; set; }
+    [Parameter] public Turn? Recommended { get; set; }
+    [Parameter] public IReadOnlyCollection<Cell>? Clickable { get; set; }
+    [Parameter] public Cell? SelectedOrigin { get; set; }
+    [Parameter] public IReadOnlyList<Segment>? SelectedPath { get; set; }
+    [Parameter] public ulong CapturedPreview { get; set; }
+    [Parameter] public ulong PendingApproachMask { get; set; }
+    [Parameter] public ulong PendingWithdrawalMask { get; set; }
+    [Parameter] public EventCallback<Cell> OnCellClick { get; set; }
+    [Parameter] public EventCallback OnRightClick { get; set; }
+
+    private (int X, int Y) P(Cell cell) => BoardGeometry.Point(cell, Flipped);
+
+    private static IEnumerable<Cell> MaskCells(ulong mask)
+    {
+        for (var bits = mask; bits != 0; bits &= bits - 1)
+            yield return new Cell(BitOperations.TrailingZeroCount(bits));
+    }
+
+    private ((double X, double Y) From, (double X, double Y) To) Shorten(Cell from, Cell to, double trim)
+    {
+        var f = P(from);
+        var t = P(to);
+        double dx = t.X - f.X, dy = t.Y - f.Y;
+        var length = Math.Sqrt(dx * dx + dy * dy);
+        return ((f.X, f.Y), (t.X - dx / length * trim, t.Y - dy / length * trim));
+    }
+
+    private static string S(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static MarkupString SvgText(int x, int y, string? cls, string content) =>
+        new($"<text x=\"{x}\" y=\"{y}\"{(cls is null ? "" : $" class=\"{cls}\"")}>{content}</text>");
+
+    private static RenderFragment CapX((int X, int Y) p, string cls) =>
+        @<g class="@cls">
+            <line x1="@(p.X - 12)" y1="@(p.Y - 12)" x2="@(p.X + 12)" y2="@(p.Y + 12)" />
+            <line x1="@(p.X - 12)" y1="@(p.Y + 12)" x2="@(p.X + 12)" y2="@(p.Y - 12)" />
+        </g>;
+}

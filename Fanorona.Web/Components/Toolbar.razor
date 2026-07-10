@@ -1,0 +1,31 @@
+<div class="toolbar">
+    <button class="btn" @onclick="() => OnNewGame.InvokeAsync()">New game</button>
+    <button class="btn" disabled="@(!CanUndo)" @onclick="() => OnUndo.InvokeAsync()">Undo</button>
+    <button class="btn" @onclick="() => OnFlip.InvokeAsync()" title="Rotate the board 180° to match the AC camera">Flip board</button>
+    <label class="think-control" title="The engine's time budget per recommendation">
+        think @ThinkSeconds.ToString("0.#")s
+        <input type="range" min="0.5" max="10" step="0.5" value="@ThinkSeconds"
+               @oninput="e => ThinkSecondsChanged.InvokeAsync(double.Parse((string)e.Value!, CultureInfo.InvariantCulture))" />
+    </label>
+    <label class="toggle">
+        <input type="checkbox" checked="@ShowMoves"
+               @onchange="e => ShowMovesChanged.InvokeAsync((bool)e.Value!)" />
+        show legal moves
+    </label>
+    <button class="btn" @onclick="() => OnSaveDialog.InvokeAsync()"
+            title="View the save text, copy it, or paste one to load — compatible with the console app's save files">
+        Save text
+    </button>
+</div>
+
+@code {
+    [Parameter] public bool CanUndo { get; set; }
+    [Parameter] public double ThinkSeconds { get; set; }
+    [Parameter] public EventCallback<double> ThinkSecondsChanged { get; set; }
+    [Parameter] public bool ShowMoves { get; set; }
+    [Parameter] public EventCallback<bool> ShowMovesChanged { get; set; }
+    [Parameter] public EventCallback OnNewGame { get; set; }
+    [Parameter] public EventCallback OnUndo { get; set; }
+    [Parameter] public EventCallback OnFlip { get; set; }
+    [Parameter] public EventCallback OnSaveDialog { get; set; }
+}

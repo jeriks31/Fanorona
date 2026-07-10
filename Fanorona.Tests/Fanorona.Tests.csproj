@@ -16,6 +16,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Fanorona.Core\Fanorona.Core.csproj" />
+        <ProjectReference Include="..\Fanorona.Web\Fanorona.Web.csproj" />
     </ItemGroup>
 
 </Project>

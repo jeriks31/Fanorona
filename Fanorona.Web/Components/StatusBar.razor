@@ -1,0 +1,25 @@
+<div class="status">
+    <span class="chip"><span class="dot @DotClass(Game.EngineSide)"></span> you: <b>@Game.EngineSide</b></span>
+    <span class="chip"><span class="dot @DotClass(Game.EngineSide.Opponent())"></span> AC opponent: <b>@Game.EngineSide.Opponent()</b></span>
+    <span class="chip">
+        pieces <b>@Game.Position.PieceCount(Player.White)</b><span class="dot white"></span>
+        / <b>@Game.Position.PieceCount(Player.Black)</b><span class="dot black"></span>
+    </span>
+    <span class="chip">move @(Game.Moves.Count / 2 + 1) — <b>@Game.Position.ToMove</b> to play</span>
+    @if (Game.LastTurn is { } last)
+    {
+        <span class="chip">
+            last move: <b>@Notation.Format(last)</b>
+            @if (Game.Moves[^1].Lenient)
+            {
+                <span class="lenient-note"> (ignored a mandatory capture)</span>
+            }
+        </span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public required Game Game { get; set; }
+
+    private static string DotClass(Player player) => player == Player.White ? "white" : "black";
+}

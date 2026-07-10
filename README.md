@@ -1,10 +1,14 @@
 # Fanorona Assistant for Assassin's Creed
 
-A console assistant for beating the Fanorona minigame AI in the Assassin's Creed games. You relay
+An assistant for beating the Fanorona minigame AI in the Assassin's Creed games. You relay
 the AC opponent's moves into the app; a game-tree search engine replies with the strongest
 move for you to play back in the game.
 
 This is not a standalone Fanorona game — it is a copilot that mirrors the AC board.
+
+It comes in two flavors: a web app (Blazor WebAssembly — everything runs in the browser,
+enter moves by clicking the board) and a console app (type moves in notation). Both share
+the same engine and the same save format.
 
 ## Requirements
 
@@ -14,11 +18,21 @@ This is not a standalone Fanorona game — it is a copilot that mirrors the AC b
 
 ```
 dotnet build
-dotnet run --project Fanorona.Console
+dotnet run --project Fanorona.Web       # web app, then open the printed localhost URL
+dotnet run --project Fanorona.Console   # console app
 ```
 
 Run the test suite with `dotnet test`. A non-interactive smoke test (engine plays itself for
 a few turns) is available via `dotnet run --project Fanorona.Console -- --demo`.
+
+## Web app deployment
+
+Pushing to `main` deploys the web app to GitHub Pages via `.github/workflows/deploy.yml`
+(one-time setup: repository Settings → Pages → Source = **GitHub Actions**). The workflow
+publishes with AOT compilation for engine speed and rewrites the base href to `/Fanorona/`,
+so the repository must be named `Fanorona`. The web app auto-saves to the browser's
+localStorage after every move and offers to resume on the next visit; its save text is
+interchangeable with the console app's save files.
 
 ## Using it alongside Assassin's Creed
 
@@ -90,5 +104,6 @@ them legal in AC too.
 | Project | Contents |
 | --- | --- |
 | `Fanorona.Core` | rules, board geometry, bitboard game state, move generation, notation, save format, and an iterative-deepening alpha-beta search with a transposition table — no dependencies |
+| `Fanorona.Web` | the Blazor WebAssembly UI: click-based move entry and an SVG board that draws the recommended move |
 | `Fanorona.Console` | the Spectre.Console UI |
-| `Fanorona.Tests` | xUnit tests for geometry, capture rules, chain constraints, notation, persistence, and engine sanity |
+| `Fanorona.Tests` | xUnit tests for geometry, capture rules, chain constraints, notation, persistence, engine sanity, and the web app's click-entry state machine |

@@ -1,0 +1,434 @@
+@page "/"
+@implements IDisposable
+@inject GameSession Session
+@inject EngineService EngineSvc
+@inject SaveStore Store
+
+<header class="app-header">
+    <h1>Fanorona Assistant — Assassin's Creed</h1>
+    <p>Relay the AC opponent's moves here and play the recommended replies in the game.</p>
+</header>
+
+<div class="app-main">
+    <div class="board-column">
+        <Toolbar CanUndo="Session.Game.Moves.Count > 0"
+                 @bind-ThinkSeconds="_thinkSeconds"
+                 @bind-ShowMoves="_showMoves"
+                 OnNewGame="() => _showSidePicker = true"
+                 OnUndo="Undo"
+                 OnFlip="() => _flipped = !_flipped"
+                 OnSaveDialog="OpenSaveDialog" />
+        <StatusBar Game="Session.Game" />
+        <BoardView Position="Session.Position"
+                   Flipped="_flipped"
+                   LastTurn="Session.Game.LastTurn"
+                   Recommended="ShowRecommendation ? _recommendation?.BestTurn : null"
+                   Clickable="EntryActive ? _input.ClickableCells : null"
+                   SelectedOrigin="EntryActive ? _input.Origin : null"
+                   SelectedPath="EntryActive ? _input.Path : null"
+                   CapturedPreview="EntryActive || _input.Pending is not null ? _input.CapturedPreview : 0"
+                   PendingApproachMask="_input.Pending?.Approach.Captured ?? 0"
+                   PendingWithdrawalMask="_input.Pending?.Withdrawal.Captured ?? 0"
+                   OnCellClick="OnBoardClick"
+                   OnRightClick="OnBoardRightClick" />
+        <div class="legend">
+            <span><span class="dot white"></span> White</span>
+            <span><span class="dot black"></span> Black</span>
+            <span><span class="g">→</span> recommended move (numbers = step order)</span>
+            <span><span class="r">✕</span> pieces it captures</span>
+            <span><span class="b">—</span> last recorded move</span>
+            <span><span class="g">◌</span> clickable point</span>
+        </div>
+    </div>
+
+    <div class="side-column">
+        @if (Session.Game.Outcome is { } outcome)
+        {
+            <div class="panel">
+                <h2>Game over</h2>
+                <div class="outcome @OutcomeClass(outcome)">@OutcomeText(outcome)</div>
+                <div class="btn-row">
+                    <button class="btn primary" @onclick="() => _showSidePicker = true">New game</button>
+                </div>
+            </div>
+        }
+        else if (ShowRecommendation)
+        {
+            <RecommendationPanel Result="_recommendation"
+                                 Thinking="_thinking"
+                                 OnPlayed="PlayRecommendation"
+                                 OnDifferent="StartOverrideEntry"
+                                 OnStop="EngineSvc.Cancel"
+                                 OnRethink="Rethink" />
+        }
+        else
+        {
+            <div class="panel">
+                @if (Session.IsEngineTurn)
+                {
+                    <h2>Enter the move you played instead</h2>
+                }
+                else
+                {
+                    <h2>Enter the opponent's (@Session.Game.EngineSide.Opponent()) move</h2>
+                }
+                <p class="hint">
+                    Click the piece that moved, then each point it moved to.
+                    Right-click takes one click back.
+                </p>
+                <div class="path-preview">@(_input.PathNotation.Length > 0 ? _input.PathNotation : "…")</div>
+                <div class="btn-row">
+                    @if (_input.CanStopHere)
+                    {
+                        <button class="btn primary" @onclick="StopEntryHere">Stop here — chain ends</button>
+                    }
+                    @if (_input.Origin is not null)
+                    {
+                        <button class="btn" @onclick="() => _input.UndoStep()">Back one click</button>
+                    }
+                    @if (_overrideEntry)
+                    {
+                        <button class="btn" @onclick="CancelOverrideEntry">Back to recommendation</button>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (_showMoves && Session.Game.Outcome is null)
+        {
+            var turns = MoveGenerator.LegalTurns(Session.Position);
+            <div class="panel">
+                <h2>@turns.Count legal move(s) for @Session.Position.ToMove</h2>
+                @if (turns[0].IsCapture)
+                {
+                    <p class="hint">Captures are mandatory. If the AC opponent plays a plain move anyway, enter it and confirm.</p>
+                }
+                <ul class="moves-list">
+                    @foreach (var turn in turns)
+                    {
+                        <li>@MoveDescriber.Summary(turn)</li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+</div>
+
+@if (_input.Pending is { } pending)
+{
+    <div class="overlay">
+        <div class="dialog">
+            <h3>Approach or withdrawal?</h3>
+            <p>
+                @pending.Approach.From to @pending.Approach.To can capture in both directions.
+                Which pieces were removed?
+            </p>
+            <button class="choice-btn approach" @onclick="() => ResolvePending(CaptureKind.Approach)">
+                <b>Approach</b>
+                <span>removes @MoveDescriber.CellList(pending.Approach.Captured) — red rings on the board</span>
+            </button>
+            <button class="choice-btn withdrawal" @onclick="() => ResolvePending(CaptureKind.Withdrawal)">
+                <b>Withdrawal</b>
+                <span>removes @MoveDescriber.CellList(pending.Withdrawal.Captured) — purple rings on the board</span>
+            </button>
+            <div class="btn-row">
+                <button class="btn" @onclick="() => _input.CancelPending()">Back</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_lenientPending is { } lenientTurn)
+{
+    <div class="overlay">
+        <div class="dialog">
+            <h3>Ignores a mandatory capture</h3>
+            <p>
+                @MoveDescriber.Summary(lenientTurn)
+            </p>
+            <p>
+                @(Session.IsEngineTurn
+                    ? "That move ignores a mandatory capture (illegal in standard Fanorona). Record it anyway?"
+                    : "That move ignores a mandatory capture — AC's AI does that sometimes. Accept it?")
+            </p>
+            <div class="btn-row">
+                <button class="btn primary" @onclick="AcceptLenient">@(Session.IsEngineTurn ? "Record it" : "Accept")</button>
+                <button class="btn" @onclick="DeclineLenient">No, re-enter</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showSidePicker)
+{
+    <div class="overlay">
+        <div class="dialog">
+            <h3>New game</h3>
+            @if (Session.Game.Moves.Count > 0 && Session.Game.Outcome is null)
+            {
+                <p>This discards the current game.</p>
+            }
+            <p>Which color do <b>you</b> play in Assassin's Creed? (White moves first)</p>
+            <div class="btn-row">
+                <button class="btn primary" @onclick="() => StartNewGame(Player.White)">White</button>
+                <button class="btn primary" @onclick="() => StartNewGame(Player.Black)">Black</button>
+                <button class="btn" @onclick="() => _showSidePicker = false">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_resumeCandidate is { } saved)
+{
+    <div class="overlay">
+        <div class="dialog">
+            <h3>Resume saved game?</h3>
+            <p>Found a saved game with @saved.Moves.Count half-move(s); you play @saved.EngineSide.</p>
+            <div class="btn-row">
+                <button class="btn primary" @onclick="ResumeSaved">Resume</button>
+                <button class="btn" @onclick="DiscardSaved">Start new game</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showSaveDialog)
+{
+    <div class="overlay">
+        <div class="dialog">
+            <h3>Save text</h3>
+            <p>
+                Copy this text to back up the game, or paste a save (also from the console app)
+                and load it. The game auto-saves in this browser after every move.
+            </p>
+            <textarea class="save-text" @bind="_saveText"></textarea>
+            @if (_saveError is not null)
+            {
+                <p class="error-text">@_saveError</p>
+            }
+            <div class="btn-row">
+                <button class="btn primary" @onclick="LoadFromText">Load this text</button>
+                <button class="btn" @onclick="() => _showSaveDialog = false">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly MoveInput _input = new();
+    private SearchResult? _recommendation;
+    private bool _thinking;
+    private int _analysisId;
+    private bool _overrideEntry;
+    private Turn? _lenientPending;
+    private bool _flipped;
+    private double _thinkSeconds = 1.5;
+    private bool _showMoves;
+    private bool _showSidePicker;
+    private bool _showSaveDialog;
+    private string _saveText = "";
+    private string? _saveError;
+    private Game? _resumeCandidate;
+
+    private bool ShowRecommendation => Session.Game.Outcome is null && Session.IsEngineTurn && !_overrideEntry;
+    private bool EntryActive => Session.Game.Outcome is null && !ShowRecommendation
+        && _lenientPending is null && _input.Pending is null;
+
+    protected override void OnInitialized()
+    {
+        Session.Changed += OnSessionChanged;
+        _input.Reset(Session.Position);
+        var text = Store.Load();
+        if (text is not null)
+        {
+            try
+            {
+                var game = Game.Deserialize(text);
+                if (game.Moves.Count > 0)
+                    _resumeCandidate = game;
+            }
+            catch (FormatException)
+            {
+                // A save this page didn't write; ignore it and start fresh.
+            }
+        }
+        if (_resumeCandidate is null)
+            _showSidePicker = true;
+    }
+
+    public void Dispose() => Session.Changed -= OnSessionChanged;
+
+    /// <summary>Every game mutation lands here: persist, reset input, restart analysis.</summary>
+    private void OnSessionChanged()
+    {
+        EngineSvc.Cancel();
+        _analysisId++;
+        _recommendation = null;
+        _thinking = false;
+        _overrideEntry = false;
+        _lenientPending = null;
+        _input.Reset(Session.Position);
+        Store.Save(Session.Game.Serialize());
+        _ = StartAnalysisIfNeeded();
+        StateHasChanged();
+    }
+
+    private async Task StartAnalysisIfNeeded()
+    {
+        if (Session.Game.Outcome is not null || !Session.IsEngineTurn || _thinking)
+            return;
+        var id = _analysisId;
+        var game = Session.Game;
+        var history = game.HistoryHashes.ToArray();
+        _thinking = true;
+        var result = await EngineSvc.AnalyzeAsync(game.Position, TimeSpan.FromSeconds(_thinkSeconds), history, r =>
+        {
+            if (id != _analysisId)
+                return;
+            _recommendation = r;
+            StateHasChanged();
+        });
+        if (id != _analysisId)
+            return;
+        _thinking = false;
+        if (result is not null)
+            _recommendation = result;
+        StateHasChanged();
+    }
+
+    private void Rethink()
+    {
+        EngineSvc.Cancel();
+        _analysisId++;
+        _recommendation = null;
+        _thinking = false;
+        _ = StartAnalysisIfNeeded();
+    }
+
+    private void PlayRecommendation()
+    {
+        Session.ApplyTurn(_recommendation!.BestTurn, lenient: false);
+    }
+
+    private void StartOverrideEntry()
+    {
+        EngineSvc.Cancel();
+        _overrideEntry = true;
+        _input.Reset(Session.Position);
+    }
+
+    private void CancelOverrideEntry()
+    {
+        _overrideEntry = false;
+        _input.Reset(Session.Position);
+        _ = StartAnalysisIfNeeded();
+    }
+
+    private void OnBoardClick(Cell cell)
+    {
+        if (!EntryActive)
+            return;
+        _input.Click(cell);
+        TryFinishEntry();
+    }
+
+    private void OnBoardRightClick()
+    {
+        if (EntryActive || _input.Pending is not null)
+            _input.UndoStep();
+    }
+
+    private void StopEntryHere()
+    {
+        _input.StopHere();
+        TryFinishEntry();
+    }
+
+    private void ResolvePending(CaptureKind kind)
+    {
+        _input.ChooseKind(kind);
+        TryFinishEntry();
+    }
+
+    private void TryFinishEntry()
+    {
+        if (_input.Completed is not { } turn)
+            return;
+        if (MoveGenerator.IsLenientOnly(Session.Position, turn))
+            _lenientPending = turn;
+        else
+            Session.ApplyTurn(turn, lenient: false);
+    }
+
+    private void AcceptLenient()
+    {
+        var turn = _lenientPending!;
+        _lenientPending = null;
+        Session.ApplyTurn(turn, lenient: true);
+    }
+
+    private void DeclineLenient()
+    {
+        _lenientPending = null;
+        _input.Reset(Session.Position);
+    }
+
+    private void Undo() => Session.Undo();
+
+    private void StartNewGame(Player yourSide)
+    {
+        _showSidePicker = false;
+        _resumeCandidate = null;
+        Session.NewGame(yourSide);
+    }
+
+    private void ResumeSaved()
+    {
+        var game = _resumeCandidate!;
+        _resumeCandidate = null;
+        Session.LoadGame(game);
+    }
+
+    private void DiscardSaved()
+    {
+        _resumeCandidate = null;
+        _showSidePicker = true;
+    }
+
+    private void OpenSaveDialog()
+    {
+        _saveText = Session.Game.Serialize();
+        _saveError = null;
+        _showSaveDialog = true;
+    }
+
+    private void LoadFromText()
+    {
+        try
+        {
+            var game = Game.Deserialize(_saveText);
+            _showSaveDialog = false;
+            Session.LoadGame(game);
+        }
+        catch (FormatException e)
+        {
+            _saveError = e.Message;
+        }
+    }
+
+    private string OutcomeText(GameOutcome outcome) => outcome switch
+    {
+        GameOutcome.Draw => "Draw by threefold repetition.",
+        GameOutcome.WhiteWins when Session.Game.EngineSide == Player.White => "You won!",
+        GameOutcome.BlackWins when Session.Game.EngineSide == Player.Black => "You won!",
+        _ => "The opponent won.",
+    };
+
+    private string OutcomeClass(GameOutcome outcome) => outcome switch
+    {
+        GameOutcome.Draw => "draw",
+        GameOutcome.WhiteWins when Session.Game.EngineSide == Player.White => "win",
+        GameOutcome.BlackWins when Session.Game.EngineSide == Player.Black => "win",
+        _ => "loss",
+    };
+}
