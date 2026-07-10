@@ -3,7 +3,7 @@
     <button class="btn" disabled="@(!CanUndo)" @onclick="() => OnUndo.InvokeAsync()">Undo</button>
     <button class="btn" @onclick="() => OnFlip.InvokeAsync()" title="Rotate the board 180° to match the AC camera">Flip board</button>
     <label class="think-control" title="The engine's time budget per recommendation">
-        think @ThinkSeconds.ToString("0.#")s
+        <span class="think-label">think @(ThinkSeconds.ToString("0.0"))s</span>
         <input type="range" min="0.5" max="10" step="0.5" value="@ThinkSeconds"
                @oninput="e => ThinkSecondsChanged.InvokeAsync(double.Parse((string)e.Value!, CultureInfo.InvariantCulture))" />
     </label>

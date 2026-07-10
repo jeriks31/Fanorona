@@ -5,10 +5,6 @@
         <div class="rec-move">@Notation.Format(result.BestTurn)</div>
         <div class="rec-meta">
             depth @result.DepthReached · @DescribeScore(result.Score) · @result.Nodes.ToString("N0") nodes
-            @if (Thinking)
-            {
-                <span class="thinking"> · <span class="spinner"></span>thinking…</span>
-            }
         </div>
         <ol class="steps">
             @foreach (var step in MoveDescriber.Steps(result.BestTurn))
@@ -19,25 +15,23 @@
         <div class="btn-row">
             <button class="btn primary" @onclick="() => OnPlayed.InvokeAsync()">✓ I played it</button>
             <button class="btn" @onclick="() => OnDifferent.InvokeAsync()">I played a different move</button>
-            @if (Thinking)
-            {
-                <button class="btn" @onclick="() => OnStop.InvokeAsync()">Stop thinking</button>
-            }
-            else
-            {
-                <button class="btn" @onclick="() => OnRethink.InvokeAsync()">Re-think</button>
-            }
+            <button class="btn" @onclick="() => OnRethink.InvokeAsync()">Re-think</button>
         </div>
     }
     else
     {
-        <p class="thinking"><span class="spinner"></span>Thinking…</p>
+        <p class="thinking">
+            <span class="spinner"></span>Thinking…@(ThinkingDepth > 0 ? $" depth {ThinkingDepth}" : "")
+        </p>
+        <div class="btn-row">
+            <button class="btn" @onclick="() => OnStop.InvokeAsync()">Stop — use best so far</button>
+        </div>
     }
 </div>
 
 @code {
     [Parameter] public SearchResult? Result { get; set; }
-    [Parameter] public bool Thinking { get; set; }
+    [Parameter] public int ThinkingDepth { get; set; }
     [Parameter] public EventCallback OnPlayed { get; set; }
     [Parameter] public EventCallback OnDifferent { get; set; }
     [Parameter] public EventCallback OnStop { get; set; }

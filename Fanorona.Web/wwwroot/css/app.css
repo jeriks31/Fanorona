@@ -130,6 +130,11 @@ button {
         accent-color: var(--accent);
     }
 
+    /* Fixed width so the slider doesn't shift under the cursor as the number changes. */
+    .think-control .think-label {
+        min-width: 4.6rem;
+    }
+
 .toggle {
     display: flex;
     align-items: center;

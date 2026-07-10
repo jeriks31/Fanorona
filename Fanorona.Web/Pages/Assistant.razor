@@ -55,7 +55,7 @@
         else if (ShowRecommendation)
         {
             <RecommendationPanel Result="_recommendation"
-                                 Thinking="_thinking"
+                                 ThinkingDepth="_thinkingDepth"
                                  OnPlayed="PlayRecommendation"
                                  OnDifferent="StartOverrideEntry"
                                  OnStop="EngineSvc.Cancel"
@@ -218,6 +218,7 @@
     private readonly MoveInput _input = new();
     private SearchResult? _recommendation;
     private bool _thinking;
+    private int _thinkingDepth;
     private int _analysisId;
     private bool _overrideEntry;
     private Turn? _lenientPending;
@@ -265,6 +266,7 @@
         _analysisId++;
         _recommendation = null;
         _thinking = false;
+        _thinkingDepth = 0;
         _overrideEntry = false;
         _lenientPending = null;
         _input.Reset(Session.Position);
@@ -281,18 +283,22 @@
         var game = Session.Game;
         var history = game.HistoryHashes.ToArray();
         _thinking = true;
+        // Interim best moves flicker if shown live, so only the depth counter updates while
+        // thinking; the move itself appears when the search settles (or is stopped).
+        SearchResult? interim = null;
         var result = await EngineSvc.AnalyzeAsync(game.Position, TimeSpan.FromSeconds(_thinkSeconds), history, r =>
         {
             if (id != _analysisId)
                 return;
-            _recommendation = r;
+            interim = r;
+            _thinkingDepth = r.DepthReached;
             StateHasChanged();
         });
         if (id != _analysisId)
             return;
         _thinking = false;
-        if (result is not null)
-            _recommendation = result;
+        _thinkingDepth = 0;
+        _recommendation = result ?? interim;
         StateHasChanged();
     }
 
@@ -302,6 +308,7 @@
         _analysisId++;
         _recommendation = null;
         _thinking = false;
+        _thinkingDepth = 0;
         _ = StartAnalysisIfNeeded();
     }
 
