@@ -7,7 +7,7 @@
     --board-bg: #2e2921;
     --board-line: #8a7a5c;
     --white-piece: #f2ecdd;
-    --black-piece: #ff8700;
+    --black-piece: #141210;
     --accent: #4cc06a;
     --accent-dim: #2c6b3d;
     --danger: #e5484d;
@@ -184,7 +184,7 @@ button {
 
     .dot.black {
         background: var(--black-piece);
-        border: 1px solid #a05500;
+        border: 1px solid #8d8574;
     }
 
 .lenient-note {
@@ -228,7 +228,7 @@ button {
 
 .piece.black {
     fill: var(--black-piece);
-    stroke: #a05500;
+    stroke: #8d8574;
     stroke-width: 3;
 }
 
