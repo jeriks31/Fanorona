@@ -4,6 +4,8 @@ An assistant for beating the Fanorona minigame AI in the Assassin's Creed games.
 the AC opponent's moves into the app; a game-tree search engine replies with the strongest
 move for you to play back in the game.
 
+Need help right now? Use the hosted web app: https://jeriks31.github.io/Fanorona/
+
 This is not a standalone Fanorona game — it is a copilot that mirrors the AC board.
 
 It comes in two flavors: a web app (Blazor WebAssembly — everything runs in the browser,
