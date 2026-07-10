@@ -1,15 +1,15 @@
 :root {
-    --bg: #1c1a17;
-    --panel: #262320;
-    --panel-edge: #3a352e;
-    --text: #e8e2d5;
-    --text-dim: #a89f8d;
-    --board-bg: #2e2921;
-    --board-line: #8a7a5c;
-    --white-piece: #f2ecdd;
-    --black-piece: #141210;
+    --bg: #15181c;
+    --panel: #1d2126;
+    --panel-edge: #333a42;
+    --text: #e3e7ec;
+    --text-dim: #96a0ac;
+    --board-bg: #22262c;
+    --board-line: #6b7684;
+    --white-piece: #eef1f4;
+    --black-piece: #131519;
     --accent: #4cc06a;
-    --accent-dim: #2c6b3d;
+    --accent-dim: #2b6a3e;
     --danger: #e5484d;
     --last-move: #58a6ff;
     --withdrawal: #c792ea;
@@ -40,7 +40,7 @@ button {
 
     .app-header h1 {
         font-size: 1.25rem;
-        color: #f0c948;
+        color: var(--accent);
     }
 
     .app-header p {
@@ -92,7 +92,7 @@ button {
 }
 
     .btn:hover:not(:disabled) {
-        background: #34302a;
+        background: #272d34;
     }
 
     .btn:disabled {
@@ -184,7 +184,7 @@ button {
 
     .dot.black {
         background: var(--black-piece);
-        border: 1px solid #8d8574;
+        border: 1px solid #8b95a2;
     }
 
 .lenient-note {
@@ -222,13 +222,13 @@ button {
 
 .piece.white {
     fill: var(--white-piece);
-    stroke: #8d8574;
+    stroke: #8b95a2;
     stroke-width: 3;
 }
 
 .piece.black {
     fill: var(--black-piece);
-    stroke: #8d8574;
+    stroke: #8b95a2;
     stroke-width: 3;
 }
 
@@ -513,7 +513,7 @@ button {
 }
 
     .choice-btn:hover {
-        background: #34302a;
+        background: #272d34;
     }
 
     .choice-btn.approach {
@@ -586,7 +586,7 @@ button {
 
     .loading-progress circle {
         fill: none;
-        stroke: #3a352e;
+        stroke: var(--panel-edge);
         stroke-width: 0.6rem;
         transform-origin: 50% 50%;
         transform: rotate(-90deg);
