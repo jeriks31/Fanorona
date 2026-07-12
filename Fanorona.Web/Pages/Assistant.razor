@@ -13,7 +13,6 @@
     <div class="board-column">
         <Toolbar CanUndo="Session.Game.Moves.Count > 0"
                  @bind-ThinkSeconds="_thinkSeconds"
-                 @bind-ShowMoves="_showMoves"
                  OnNewGame="() => _showSidePicker = true"
                  OnUndo="Undo"
                  OnFlip="() => _flipped = !_flipped"
@@ -94,23 +93,24 @@
             </div>
         }
 
-        @if (_showMoves && Session.Game.Outcome is null)
-        {
-            var turns = MoveGenerator.LegalTurns(Session.Position);
-            <div class="panel">
-                <h2>@turns.Count legal move(s) for @Session.Position.ToMove</h2>
-                @if (turns[0].IsCapture)
-                {
-                    <p class="hint">Captures are mandatory. If the AC opponent plays a plain move anyway, enter it and confirm.</p>
-                }
-                <ul class="moves-list">
-                    @foreach (var turn in turns)
+        <div class="panel">
+            <h2>Move history</h2>
+            @if (Session.Game.Moves.Count == 0)
+            {
+                <p class="hint">No moves recorded yet.</p>
+            }
+            else
+            {
+                <ol class="moves-list">
+                    @for (var i = 0; i < Session.Game.Moves.Count; i++)
                     {
-                        <li>@MoveDescriber.Summary(turn)</li>
+                        var move = Session.Game.Moves[i];
+                        var player = i % 2 == 0 ? Player.White : Player.Black;
+                        <li><b>@player:</b> @MoveDescriber.Summary(move.Turn)</li>
                     }
-                </ul>
-            </div>
-        }
+                </ol>
+            }
+        </div>
     </div>
 </div>
 
@@ -198,8 +198,8 @@
         <div class="dialog">
             <h3>Save text</h3>
             <p>
-                Copy this text to back up the game, or paste a save (also from the console app)
-                and load it. The game auto-saves in this browser after every move.
+                The game auto-saves in this browser. Copy this text for a portable backup,
+                or paste a backup to load it.
             </p>
             <textarea class="save-text" @bind="_saveText"></textarea>
             @if (_saveError is not null)
@@ -224,7 +224,6 @@
     private Turn? _lenientPending;
     private bool _flipped;
     private double _thinkSeconds = 1.5;
-    private bool _showMoves;
     private bool _showSidePicker;
     private bool _showSaveDialog;
     private string _saveText = "";
